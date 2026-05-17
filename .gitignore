@@ -176,3 +176,4 @@ report/*.blg
 # Data and large files (Optional but recommended for data science)
 # part2/data/*.csv
 # *.pdf
+lenv/

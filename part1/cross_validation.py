@@ -1,54 +1,48 @@
-import numpy as np
+from matrix_ops import *
+import random
 
-def add_intercept(X):
-    """Thêm cột toàn 1 vào ma trận X nếu chưa có (intercept)."""
-    if X.ndim == 1:
-        X = X.reshape(-1, 1)
-    if not np.allclose(X[:, 0], 1):
-        X = np.hstack([np.ones((X.shape[0], 1)), X])
-    return X
 
 def kfold_cv(X, y, k=5, random_state=None):
-    """
-    Cài đặt k-fold cross-validation, tính CV score (Mean Squared Error).
-    Trả về điểm số CV trung bình và danh sách điểm của từng fold.
-    """
     n = len(y)
-    indices = np.arange(n)
+    indices = list(range(n))
     
     if random_state is not None:
-        np.random.seed(random_state)
-        np.random.shuffle(indices)
+        random.seed(random_state)
+        random.shuffle(indices)
         
-    fold_sizes = np.full(k, n // k, dtype=int)
-    fold_sizes[:n % k] += 1
-    
+    fold_sizes = [n // k] * k
+    for i in range(n % k):
+        fold_sizes[i] += 1
+        
     current = 0
     folds = []
     for fold_size in fold_sizes:
-        start, stop = current, current + fold_size
-        folds.append(indices[start:stop])
-        current = stop
+        folds.append(indices[current:current + fold_size])
+        current += fold_size
         
     mse_scores = []
     
     for i in range(k):
         test_indices = folds[i]
-        train_indices = np.hstack([folds[j] for j in range(k) if j != i])
+        train_indices = [idx for j in range(k) if j != i for idx in folds[j]]
         
-        X_train, y_train = X[train_indices], y[train_indices]
-        X_test, y_test = X[test_indices], y[test_indices]
+        X_train = [X[idx] for idx in train_indices]
+        y_train = [y[idx] for idx in train_indices]
+        X_test = [X[idx] for idx in test_indices]
+        y_test = [y[idx] for idx in test_indices]
         
-        # Fit OLS trên tập train
-        X_train_intercept = add_intercept(X_train)
-        beta_hat = np.linalg.inv(X_train_intercept.T @ X_train_intercept) @ X_train_intercept.T @ y_train
+        X_train_int = add_intercept(X_train)
+        Xt = transpose(X_train_int)
+        XtX_inv = invert(matmul(Xt, X_train_int))
+        y_train_col = [[yi] for yi in y_train]
+        beta_col = matmul(XtX_inv, matmul(Xt, y_train_col))
         
-        # Dự đoán trên tập test
-        X_test_intercept = add_intercept(X_test)
-        y_pred = X_test_intercept @ beta_hat
+        X_test_int = add_intercept(X_test)
+        y_pred_col = matmul(X_test_int, beta_col)
+        y_pred = [yp[0] for yp in y_pred_col]
         
-        mse = np.mean((y_test - y_pred)**2)
+        mse = sum((y_test[j] - y_pred[j])**2 for j in range(len(y_test))) / len(y_test)
         mse_scores.append(mse)
         
-    cv_score = np.mean(mse_scores)
+    cv_score = sum(mse_scores) / k
     return cv_score, mse_scores
