@@ -1,4 +1,4 @@
-import numpy as np
+from matrix_ops import *
 import matplotlib.pyplot as plt
 
 def vif(X):
