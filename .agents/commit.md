@@ -1,0 +1,1 @@
+Always commit with the format "verb (summarize the main action): brief description"
