@@ -68,16 +68,15 @@ def eye(n):
     return [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
 
 def add_intercept(X):
-    new_X = []
-    for row in X:
-        if isinstance(row, list):
-            if len(row) > 0 and row[0] == 1.0:
-                new_X.append(row[:])
-            else:
-                new_X.append([1.0] + row)
+    if not X:
+        return []
+    if not isinstance(X[0], (list, tuple)):
+        if all(x == 1.0 for x in X):
+            return [[x] for x in X]
         else:
-            if row == 1.0:
-                new_X.append([row])
-            else:
-                new_X.append([1.0, row])
-    return new_X
+            return [[1.0, x] for x in X]
+    else:
+        if len(X) > 1 and all(len(row) > 0 and row[0] == 1.0 for row in X):
+            return [list(row) for row in X]
+        else:
+            return [[1.0] + list(row) for row in X]
