@@ -35,29 +35,37 @@ def residual_plots(X, y, beta_hat):
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     
     # 1. Residuals vs Fitted
-    axes[0, 0].scatter(y_hat, residuals, alpha=0.6, edgecolors='w')
-    axes[0, 0].axhline(0, color='r', linestyle='--')
+    axes[0, 0].scatter(y_hat, residuals, alpha=0.6, edgecolors='w', label='Observations')
+    axes[0, 0].axhline(0, color='r', linestyle='--', label='Zero Reference')
     axes[0, 0].set_xlabel('Fitted values')
     axes[0, 0].set_ylabel('Residuals')
     axes[0, 0].set_title('Residuals vs Fitted')
+    axes[0, 0].legend()
     
     # 2. Normal Q-Q
     stats.probplot(std_residuals, dist="norm", plot=axes[0, 1])
+    axes[0, 1].get_lines()[0].set_label('Observed Quantiles')
+    axes[0, 1].get_lines()[1].set_label('Theoretical Line')
+    axes[0, 1].set_xlabel('Theoretical Quantiles')
+    axes[0, 1].set_ylabel('Standardized Residuals')
     axes[0, 1].set_title('Normal Q-Q')
+    axes[0, 1].legend()
     
     # 3. Scale-Location
     sqrt_abs_std_res = [math.sqrt(abs(sr)) for sr in std_residuals]
-    axes[1, 0].scatter(y_hat, sqrt_abs_std_res, alpha=0.6, edgecolors='w')
+    axes[1, 0].scatter(y_hat, sqrt_abs_std_res, alpha=0.6, edgecolors='w', label='Observations')
     axes[1, 0].set_xlabel('Fitted values')
-    axes[1, 0].set_ylabel('$\sqrt{|Standardized Residuals|}$')
+    axes[1, 0].set_ylabel(r'$\sqrt{|Standardized Residuals|}$')
     axes[1, 0].set_title('Scale-Location')
+    axes[1, 0].legend()
     
     # 4. Residuals vs Leverage
-    axes[1, 1].scatter(leverage, std_residuals, alpha=0.6, edgecolors='w')
-    axes[1, 1].axhline(0, color='r', linestyle='--')
+    axes[1, 1].scatter(leverage, std_residuals, alpha=0.6, edgecolors='w', label='Observations')
+    axes[1, 1].axhline(0, color='r', linestyle='--', label='Zero Reference')
     axes[1, 1].set_xlabel('Leverage')
     axes[1, 1].set_ylabel('Standardized Residuals')
     axes[1, 1].set_title('Residuals vs Leverage')
+    axes[1, 1].legend()
     
     plt.tight_layout()
     plt.show()
