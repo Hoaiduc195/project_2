@@ -1,4 +1,4 @@
-from matrix_ops import *
+from .matrix_ops import *
 import scipy.stats as stats
 import random
 import math
@@ -179,3 +179,14 @@ def gauss_markov_monte_carlo(n_simulations=1000, n=100, p=2, true_beta=None, sig
         'var_ols': var_ols,
         'var_other': var_other
     }
+
+def ols_predict(X, beta_hat):
+    X_int = add_intercept(X)
+
+    beta_col = [[b] for b in beta_hat]
+
+    y_hat_col = matmul(X_int, beta_col)
+
+    y_hat = [row[0] for row in y_hat_col]
+
+    return y_hat
