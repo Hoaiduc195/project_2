@@ -1,5 +1,9 @@
-from matrix_ops import *
+try:
+    from matrix_ops import *
+except ModuleNotFoundError:
+    from part1.matrix_ops import *
 import matplotlib.pyplot as plt
+import numpy as np
 
 def vif(X):
     """
@@ -66,24 +70,39 @@ def vif(X):
             
     return vifs
 
-def ridge_fit(X, y, lam):
+def ridge_fit(X, y, lam_values, plot=False):
     """
     Fit Ridge Regression from scratch using the closed-form Normal Equations.
     
     Parameters:
     -----------
-    X : numpy.ndarray of shape (n, p)
-        The design matrix. Assumed to have a constant column at index 0.
-    y : numpy.ndarray of shape (n,)
+    X : numpy.ndarray of shape (n, p) or array-like
+        The design matrix (with or without intercept).
+    y : numpy.ndarray of shape (n,) or array-like
         The target values.
-    lam : float
-        L2 regularization parameter (lambda >= 0).
+    lam_values : float or array-like
+        L2 regularization parameter (lambda >= 0), or a list/array of parameters.
+    plot : bool, optional
+        If True and lam_values is a list/array, plots the ridge trace.
         
     Returns:
     --------
-    beta : numpy.ndarray of shape (p,)
+    beta : numpy.ndarray of shape (p,) or list of numpy.ndarray
         Estimated regression coefficients.
     """
+    X = add_intercept(X)
+    X = np.asarray(X)
+    y = np.asarray(y)
+    
+    if isinstance(lam_values, (list, tuple, np.ndarray)):
+        betas = []
+        for l in lam_values:
+            beta = ridge_fit(X, y, l)
+            betas.append(beta)
+        if plot:
+            plot_ridge_trace(X, y, lambdas=lam_values)
+        return betas
+        
     n, p = X.shape
     
     # Exclude intercept beta_0 from L2 regularization
@@ -91,34 +110,49 @@ def ridge_fit(X, y, lam):
     I[0, 0] = 0.0
     
     # Solve the system (X^T * X + lambda * I) * beta = X^T * y
-    A = X.T @ X + lam * I
+    A = X.T @ X + lam_values * I
     b = X.T @ y
     
     beta = np.linalg.solve(A, b)
     return beta
 
-def lasso_fit(X, y, lam, max_iter=1000, tol=1e-4):
+def lasso_fit(X, y, lam_values, max_iter=1000, tol=1e-6, plot=False):
     """
     Fit Lasso Regression from scratch using Coordinate Descent.
     
     Parameters:
     -----------
-    X : numpy.ndarray of shape (n, p)
-        The design matrix. Assumed to have a constant column (intercept) at index 0.
-    y : numpy.ndarray of shape (n,)
+    X : numpy.ndarray of shape (n, p) or array-like
+        The design matrix (with or without intercept).
+    y : numpy.ndarray of shape (n,) or array-like
         The target values.
-    lam : float
-        L1 regularization parameter (lambda >= 0).
+    lam_values : float or array-like
+        L1 regularization parameter (lambda >= 0), or a list/array of parameters.
     max_iter : int
         Maximum number of iterations.
     tol : float
         Tolerance for convergence.
+    plot : bool, optional
+        If True and lam_values is a list/array, plots the lasso trace.
         
     Returns:
     --------
-    beta : numpy.ndarray of shape (p,)
+    beta : numpy.ndarray of shape (p,) or list of numpy.ndarray
         Estimated regression coefficients.
     """
+    X = add_intercept(X)
+    X = np.asarray(X)
+    y = np.asarray(y)
+    
+    if isinstance(lam_values, (list, tuple, np.ndarray)):
+        betas = []
+        for l in lam_values:
+            beta = lasso_fit(X, y, l, max_iter=max_iter, tol=tol)
+            betas.append(beta)
+        if plot:
+            plot_lasso_trace(X, y, lambdas=lam_values)
+        return betas
+        
     n, p = X.shape
     beta = np.zeros(p)
     y_hat = np.zeros(n) # Since beta is initialized to zeros
@@ -141,7 +175,7 @@ def lasso_fit(X, y, lam, max_iter=1000, tol=1e-4):
                 beta[j] = rho_j / sum_sq_Xj
             else:
                 # Features are penalized with L1
-                lambda_n = lam * n
+                lambda_n = lam_values * n
                 if rho_j < -lambda_n:
                     beta[j] = (rho_j + lambda_n) / sum_sq_Xj
                 elif rho_j > lambda_n:
@@ -165,9 +199,9 @@ def plot_ridge_trace(X, y, lambdas=None, feature_names=None, save_path=None):
     
     Parameters:
     -----------
-    X : numpy.ndarray of shape (n, p)
+    X : numpy.ndarray of shape (n, p) or array-like
         The design matrix with constant intercept in column 0.
-    y : numpy.ndarray of shape (n,)
+    y : numpy.ndarray of shape (n,) or array-like
         The target values.
     lambdas : array-like or None
         List of regularization parameters to scan.
@@ -176,6 +210,9 @@ def plot_ridge_trace(X, y, lambdas=None, feature_names=None, save_path=None):
     save_path : str or None
         File path to save the generated plot. If None, it will be displayed.
     """
+    X = np.asarray(X)
+    y = np.asarray(y)
+    
     if lambdas is None:
         lambdas = np.logspace(-4, 4, 100)
     
@@ -204,3 +241,54 @@ def plot_ridge_trace(X, y, lambdas=None, feature_names=None, save_path=None):
         plt.close()
     else:
         plt.show()
+
+def plot_lasso_trace(X, y, lambdas=None, feature_names=None, save_path=None):
+    """
+    Plot the Lasso regression coefficient trace across varying lambdas.
+    
+    Parameters:
+    -----------
+    X : numpy.ndarray of shape (n, p) or array-like
+        The design matrix with constant intercept in column 0.
+    y : numpy.ndarray of shape (n,) or array-like
+        The target values.
+    lambdas : array-like or None
+        List of regularization parameters to scan.
+    feature_names : list of str or None
+        Names of features to display in the legend.
+    save_path : str or None
+        File path to save the generated plot. If None, it will be displayed.
+    """
+    X = np.asarray(X)
+    y = np.asarray(y)
+    
+    if lambdas is None:
+        lambdas = np.logspace(-4, 1, 100)
+    
+    coefs = []
+    for lam in lambdas:
+        beta = lasso_fit(X, y, lam)
+        coefs.append(beta[1:]) # Skip intercept
+    coefs = np.array(coefs)
+    
+    plt.figure(figsize=(10, 6))
+    num_features = coefs.shape[1]
+    
+    for i in range(num_features):
+        name = feature_names[i] if (feature_names is not None and i < len(feature_names)) else f'Feature {i+1}'
+        plt.plot(lambdas, coefs[:, i], label=name)
+        
+    plt.xscale('log')
+    plt.xlabel('Regularization parameter $\\lambda$')
+    plt.ylabel('Coefficients $\\beta$')
+    plt.title('Lasso Regression Coefficient Trace')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.grid(True, which="both", ls="--")
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
+        plt.close()
+    else:
+        plt.show()
+
+

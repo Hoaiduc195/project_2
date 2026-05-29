@@ -80,7 +80,7 @@ try:
     dp_test = DataPipeline()
     if not hasattr(dp_test, 'fit') or not hasattr(dp_test, 'transform'):
         raise ImportError
-except (ImportError, AttributeError):
+except (ImportError, AttributeError, TypeError):
     # Stateful Processing Pipeline Fallback Implementation
     class DataPipeline:
         """
@@ -300,9 +300,9 @@ def run_feature_selection(X_train, y_train, column_names):
     
     # 2. p-value Pruning (statistical confidence filter)
     X_vif = X_train[:, current_indices]
-    beta_vif, sigma2_vif, _, _ = ols_fit(X_vif, y_train)
+    beta_vif, sigma2_vif = ols_fit(X_vif, y_train)[:2]
     inf_vif = coef_inference(X_vif, y_train, beta_vif, sigma2_vif)
-    p_vals = inf_vif['p_values']
+    p_vals = inf_vif.get('p_value', inf_vif.get('p_values'))
     
     final_indices = [current_indices[0]] # Intercept
     for i in range(1, len(current_indices)):
@@ -499,7 +499,7 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     # MODEL 1: Baseline OLS
     # ==========================================
     print("\n--- Model 1: Baseline OLS (All Columns) ---")
-    beta_ols, sigma2_ols, _, _ = ols_fit(X_train, y_train)
+    beta_ols, sigma2_ols = ols_fit(X_train, y_train)[:2]
     y_pred_ols = X_test @ beta_ols
     
     results['Baseline OLS'] = {
@@ -518,7 +518,7 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     X_train_sel = X_train[:, selected_indices]
     X_test_sel = X_test[:, selected_indices]
     
-    beta_sel, sigma2_sel, _, _ = ols_fit(X_train_sel, y_train)
+    beta_sel, sigma2_sel = ols_fit(X_train_sel, y_train)[:2]
     y_pred_sel = X_test_sel @ beta_sel
     
     results['Feature-Selected OLS'] = {

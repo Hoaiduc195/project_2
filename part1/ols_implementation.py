@@ -1,4 +1,8 @@
-from .matrix_ops import *
+try:
+    from matrix_ops import *
+except ModuleNotFoundError:
+    from part1.matrix_ops import *
+
 import scipy.stats as stats
 import random
 import math

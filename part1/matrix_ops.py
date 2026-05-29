@@ -1,7 +1,7 @@
 import math
 
 def transpose(A):
-    if not A: return []
+    if len(A) == 0: return []
     if not isinstance(A[0], list):
         return [[x] for x in A]
     return [[A[i][j] for i in range(len(A))] for j in range(len(A[0]))]
@@ -68,9 +68,10 @@ def eye(n):
     return [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
 
 def add_intercept(X):
-    if not X:
+    if len(X) == 0:
         return []
-    if not isinstance(X[0], (list, tuple)):
+    is_1d = not (isinstance(X[0], (list, tuple)) or type(X[0]).__name__ == 'ndarray')
+    if is_1d:
         if all(x == 1.0 for x in X):
             return [[x] for x in X]
         else:
