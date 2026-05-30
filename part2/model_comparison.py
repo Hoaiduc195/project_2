@@ -20,12 +20,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import Ridge, Lasso, and VIF from part1
 try:
     from part1.ridge_lasso import vif, ridge_fit, lasso_fit
-    X_probe = np.column_stack([np.ones(5), np.arange(5, dtype=float)])
-    y_probe = np.arange(5, dtype=float)
-    if len(ridge_fit(X_probe, y_probe, 1.0)) != X_probe.shape[1]:
-        raise ImportError
-    if len(lasso_fit(X_probe, y_probe, 1.0, max_iter=2)) != X_probe.shape[1]:
-        raise ImportError
 except ImportError:
     # Local fallback for Ridge/Lasso if import fails (should succeed)
     def vif(X):
