@@ -20,6 +20,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import Ridge, Lasso, and VIF from part1
 try:
     from part1.ridge_lasso import vif, ridge_fit, lasso_fit
+    X_probe = np.column_stack([np.ones(5), np.arange(5, dtype=float)])
+    y_probe = np.arange(5, dtype=float)
+    if len(ridge_fit(X_probe, y_probe, 1.0)) != X_probe.shape[1]:
+        raise ImportError
+    if len(lasso_fit(X_probe, y_probe, 1.0, max_iter=2)) != X_probe.shape[1]:
+        raise ImportError
 except ImportError:
     # Local fallback for Ridge/Lasso if import fails (should succeed)
     def vif(X):
@@ -710,16 +716,22 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     # Top 10 predictive features in best model
     best_model_name = df_metrics['R2_test'].idxmax()
     print(f"\nBest Model identified by R2_test: {best_model_name}")
-    print(f"\nTop 10 strongest features (absolute weight) in the Best Model ({best_model_name}):")
-    best_beta = coefficients[best_model_name]
-    # Skip intercept at index 0 for ranking features
-    features_only = column_names[1:]
-    weights_only = best_beta[1:]
-    sorted_idx = np.argsort(np.abs(weights_only))[::-1]
+    if best_model_name in coefficients:
+        print(f"\nTop 10 strongest features (absolute weight) in the Best Model ({best_model_name}):")
+        best_beta = coefficients[best_model_name]
+        # Skip intercept at index 0 for ranking features
+        features_only = column_names[1:]
+        weights_only = best_beta[1:]
+        sorted_idx = np.argsort(np.abs(weights_only))[::-1]
 
-    for rank in range(min(10, len(features_only))):
-        idx = sorted_idx[rank]
-        print(f"  {rank+1:2d}. {features_only[idx]:<25}: Weight = {weights_only[idx]:.4f}")
+        for rank in range(min(10, len(features_only))):
+            idx = sorted_idx[rank]
+            print(f"  {rank+1:2d}. {features_only[idx]:<25}: Weight = {weights_only[idx]:.4f}")
+    else:
+        print(
+            f"\n[Info] {best_model_name} does not expose original-space feature "
+            "coefficients, so coefficient ranking is skipped."
+        )
 
     # ==========================================
     # DIAGNOSTICS PLOTS FOR THE BEST MODEL
