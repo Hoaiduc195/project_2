@@ -1,9 +1,22 @@
+from pathlib import Path
+import sys
+
 import pandas as pd
-from part1.ols_implementation import model_metrics
-from .eda import EDA
-from .preprocessing import Preprocessor
-from .model_registry import build_models
-from .utils import metrics_summary, test_metrics_summary
+
+if __package__ is None or __package__ == "":
+	project_root = Path(__file__).resolve().parents[1]
+	if str(project_root) not in sys.path:
+		sys.path.insert(0, str(project_root))
+
+	from part2.eda import EDA
+	from part2.preprocessing import Preprocessor
+	from part2.model_registry import build_models
+	from part2.utils import test_metrics_summary
+else:
+	from .eda import EDA
+	from .preprocessing import Preprocessor
+	from .model_registry import build_models
+	from .utils import test_metrics_summary
 
 class DataPipeline:
 	def __init__(self, data_source, target_col, model_names=None, model_params=None):
@@ -60,5 +73,5 @@ class DataPipeline:
 		self.evaluate()
 
 if __name__ == "__main__":
-	pipeline = DataPipeline(data_source='part2/weatherAUS.csv', target_col='RISK_MM', model_names=['ols_basic', 'ols_selected', 'ols_lib'])
+	pipeline = DataPipeline(data_source='data/weatherAUS.csv', target_col='RISK_MM', model_names=['ols_basic', 'ols_selected', 'ols_lib'])
 	pipeline.run()

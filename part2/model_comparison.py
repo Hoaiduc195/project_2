@@ -6,13 +6,26 @@ import matplotlib
 matplotlib.use('Agg') # Headless plotting to prevent blocking
 import matplotlib.pyplot as plt
 import scipy.special as sp
-
+from advanced_methods import (
+    KernelRidgeRegression,
+    BayesianLinearRegression,
+    remove_intercept_column,
+    tune_krr,
+    tune_bayesian_regression,
+    validation_split,
+)
 # Add parent directory to path to ensure we can import from part1
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import Ridge, Lasso, and VIF from part1
 try:
     from part1.ridge_lasso import vif, ridge_fit, lasso_fit
+    X_probe = np.column_stack([np.ones(5), np.arange(5, dtype=float)])
+    y_probe = np.arange(5, dtype=float)
+    if len(ridge_fit(X_probe, y_probe, 1.0)) != X_probe.shape[1]:
+        raise ImportError
+    if len(lasso_fit(X_probe, y_probe, 1.0, max_iter=2)) != X_probe.shape[1]:
+        raise ImportError
 except ImportError:
     # Local fallback for Ridge/Lasso if import fails (should succeed)
     def vif(X):
@@ -164,6 +177,14 @@ try:
     # Check if they are callable
     if not callable(ols_fit) or not callable(coef_inference):
         raise ImportError
+    X_probe = np.column_stack([np.ones(5), np.arange(5, dtype=float)])
+    y_probe = np.arange(5, dtype=float)
+    ols_probe = ols_fit(X_probe, y_probe)
+    if len(ols_probe) != 4 or len(ols_probe[0]) != X_probe.shape[1]:
+        raise ImportError
+    inference_probe = coef_inference(X_probe, y_probe, ols_probe[0], ols_probe[1])
+    if 'p_values' not in inference_probe:
+        raise ImportError
 except (ImportError, AttributeError):
     # Fallback OLS Implementations
     def ols_fit(X, y):
@@ -300,9 +321,9 @@ def run_feature_selection(X_train, y_train, column_names):
     
     # 2. p-value Pruning (statistical confidence filter)
     X_vif = X_train[:, current_indices]
-    beta_vif, sigma2_vif = ols_fit(X_vif, y_train)[:2]
+    beta_vif, sigma2_vif, _, _ = ols_fit(X_vif, y_train)
     inf_vif = coef_inference(X_vif, y_train, beta_vif, sigma2_vif)
-    p_vals = inf_vif.get('p_value', inf_vif.get('p_values'))
+    p_vals = inf_vif['p_values']
     
     final_indices = [current_indices[0]] # Intercept
     for i in range(1, len(current_indices)):
@@ -499,7 +520,7 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     # MODEL 1: Baseline OLS
     # ==========================================
     print("\n--- Model 1: Baseline OLS (All Columns) ---")
-    beta_ols, sigma2_ols = ols_fit(X_train, y_train)[:2]
+    beta_ols, sigma2_ols, _, _ = ols_fit(X_train, y_train)
     y_pred_ols = X_test @ beta_ols
     
     results['Baseline OLS'] = {
@@ -518,7 +539,7 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     X_train_sel = X_train[:, selected_indices]
     X_test_sel = X_test[:, selected_indices]
     
-    beta_sel, sigma2_sel = ols_fit(X_train_sel, y_train)[:2]
+    beta_sel, sigma2_sel, _, _ = ols_fit(X_train_sel, y_train)
     y_pred_sel = X_test_sel @ beta_sel
     
     results['Feature-Selected OLS'] = {
@@ -575,6 +596,85 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     print(f"  MAE: {results['Optimized Lasso']['MAE']:.4f} | RMSE: {results['Optimized Lasso']['RMSE']:.4f} | R2_test: {results['Optimized Lasso']['R2_test']:.4f}")
     
     # ==========================================
+    # MODEL 5: Exact Kernel Ridge Regression
+    # ==========================================
+    print("\n--- Model 5: Exact Kernel Ridge Regression ---")
+
+    # KRR uses distances; remove explicit intercept if it exists.
+    X_train_krr = remove_intercept_column(X_train, column_names)
+    X_test_krr = remove_intercept_column(X_test, column_names)
+
+
+    print(f"  - Exact KRR training subset: {X_train_krr.shape}")
+
+    best_krr, best_krr_params, krr_tuning_df = tune_krr(
+        X_train=X_train_krr,
+        y_train=y_train,
+        val_size=0.2,
+        random_state=random_state,
+        batch_size=5000
+    )
+
+    y_pred_krr = best_krr.predict(X_test_krr, batch_size=5000)
+
+    results['Kernel Ridge'] = {
+        'MAE': compute_mae(y_test, y_pred_krr),
+        'RMSE': compute_rmse(y_test, y_pred_krr),
+        'R2_test': compute_r2(y_test, y_pred_krr)
+    }
+
+    print(f"  - Best KRR params: {best_krr_params}")
+    print(f"  MAE: {results['Kernel Ridge']['MAE']:.4f} | RMSE: {results['Kernel Ridge']['RMSE']:.4f} | R2_test: {results['Kernel Ridge']['R2_test']:.4f}")
+
+
+    # ==========================================
+    # MODEL 6: Bayesian Linear Regression
+    # ==========================================
+    print("\n--- Model 6: Bayesian Linear Regression ---")
+
+    best_bayes, best_bayes_params, bayes_tuning_df = tune_bayesian_regression(
+        X_train=X_train,
+        y_train=y_train,
+        alpha_values=None,
+        sigma2_values=None,
+        val_size=0.2,
+        random_state=random_state
+    )
+
+    y_pred_bayes, y_std_bayes = best_bayes.predict(X_test, return_std=True)
+
+    results['Bayesian Linear Regression'] = {
+        'MAE': compute_mae(y_test, y_pred_bayes),
+        'RMSE': compute_rmse(y_test, y_pred_bayes),
+        'R2_test': compute_r2(y_test, y_pred_bayes)
+    }
+
+    coefficients['Bayesian Linear Regression'] = best_bayes.posterior_mean
+
+    print(f"  - Best Bayesian params: {best_bayes_params}")
+    print(f"  MAE: {results['Bayesian Linear Regression']['MAE']:.4f} | RMSE: {results['Bayesian Linear Regression']['RMSE']:.4f} | R2_test: {results['Bayesian Linear Regression']['R2_test']:.4f}")
+
+    # Save tuning outputs for report
+    try:
+        krr_tuning_df.to_csv("krr_tuning_results.csv", index=False)
+        bayes_tuning_df.to_csv("bayesian_tuning_results.csv", index=False)
+
+        lower_95 = y_pred_bayes - 1.96 * y_std_bayes
+        upper_95 = y_pred_bayes + 1.96 * y_std_bayes
+
+        bayes_intervals = pd.DataFrame({
+            "Actual": y_test[:50],
+            "Prediction": y_pred_bayes[:50],
+            "Lower_95": lower_95[:50],
+            "Upper_95": upper_95[:50]
+        })
+        bayes_intervals.to_csv("bayesian_prediction_intervals.csv", index=False)
+
+        print("[Save] Saved KRR/Bayesian tuning and interval CSV files.")
+    except Exception as e:
+        print(f"[Warning] Could not save advanced-model CSV files: {e}")
+
+    # ==========================================
     # PERFORMANCE COMPARISON TABLE
     # ==========================================
     print("\n==============================================")
@@ -594,11 +694,11 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     df_metrics = pd.DataFrame(results).T
     print(df_to_md(df_metrics))
     print("==============================================")
-    
+
     # Save metrics table to CSV for documentation
-    df_metrics.to_csv("part2/model_comparison_results.csv")
+    df_metrics.to_csv("model_comparison_results.csv")
     print("[Save] Saved metrics table to 'part2/model_comparison_results.csv'")
-    
+
     # ==========================================
     # COEFFICIENT ANALYSIS
     # ==========================================
@@ -606,13 +706,13 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     df_coefs = pd.DataFrame(index=column_names)
     for model_name, beta in coefficients.items():
         df_coefs[model_name] = beta
-        
+
     # Calculate non-zero weights count
     sparsity = {name: np.sum(np.abs(beta[1:]) > 1e-4) for name, beta in coefficients.items()}
     print("\nNumber of Active (Non-zero) Features (excluding Intercept):")
     for name, cnt in sparsity.items():
         print(f"  - {name}: {cnt} / {len(column_names)-1}")
-        
+
     # Top 10 predictive features in best model
     best_model_name = df_metrics['R2_test'].idxmax()
     print(f"\nBest Model identified by R2_test: {best_model_name}")
@@ -622,21 +722,54 @@ def run_benchmarking(data_path, sample_size=10000, random_state=42):
     features_only = column_names[1:]
     weights_only = best_beta[1:]
     sorted_idx = np.argsort(np.abs(weights_only))[::-1]
-    
+
     for rank in range(min(10, len(features_only))):
         idx = sorted_idx[rank]
         print(f"  {rank+1:2d}. {features_only[idx]:<25}: Weight = {weights_only[idx]:.4f}")
-        
+
     # ==========================================
     # DIAGNOSTICS PLOTS FOR THE BEST MODEL
     # ==========================================
     print(f"\nGenerating analytical diagnostics for best-performing model: {best_model_name}...")
+
     if best_model_name == 'Feature-Selected OLS':
-        # Need to use the sliced design matrices
-        residual_plots(X_train_sel, y_train, beta_sel, save_path="part2/best_model_diagnostics.png")
+        residual_plots(
+            X_train_sel,
+            y_train,
+            beta_sel,
+            save_path="best_model_diagnostics.png"
+        )
+
+    elif best_model_name in coefficients:
+        residual_plots(
+            X_train,
+            y_train,
+            coefficients[best_model_name],
+            save_path="best_model_diagnostics.png"
+        )
+
+    elif best_model_name == 'Kernel Ridge':
+        # Kernel Ridge has no original-space beta coefficients,
+        # so use a direct residual-vs-fitted diagnostic.
+        train_pred_krr = best_krr.predict(X_train_krr, batch_size=5000)
+        residuals_krr = y_train - train_pred_krr
+
+        plt.figure(figsize=(8, 5))
+        plt.scatter(train_pred_krr, residuals_krr, alpha=0.5)
+        plt.axhline(0, color='red', linestyle='--')
+        plt.xlabel("Fitted Values")
+        plt.ylabel("Residuals")
+        plt.title("Exact Kernel Ridge: Residuals vs Fitted")
+        plt.grid(True, linestyle=':', alpha=0.6)
+        plt.tight_layout()
+        plt.savefig("best_model_diagnostics.png", dpi=300)
+        plt.close()
+
+        print("[Plots] Saved kernel residual plot to best_model_diagnostics.png")
+
     else:
-        residual_plots(X_train, y_train, coefficients[best_model_name], save_path="part2/best_model_diagnostics.png")
-        
+        print(f"[Warning] No diagnostic plot rule defined for {best_model_name}.")
+
     print("\n==============================================")
     print("BENCHMARKING AND COMPARISON COMPLETE")
     print("==============================================\n")
